@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="km">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=0">
+  <title>របាយការណ៍គ្រូបង្រៀន</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f4f7f6; font-family: 'Khmer OS Battambang', sans-serif; padding-bottom: 30px; }
+    .app-header { background: linear-gradient(135deg, #1a73e8, #4285f4); color: white; padding: 18px 15px; text-align: center; font-weight: bold; font-size: 18px; position: sticky; top: 0; z-index: 1000; box-shadow: 0 4px 10px rgba(0,0,0,0.1); border-bottom-left-radius: 15px; border-bottom-right-radius: 15px; }
+    .filter-box { background: white; border-radius: 12px; padding: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 20px; }
+    .summary-box { background: white; border-radius: 12px; padding: 12px 10px; text-align: center; box-shadow: 0 2px 8px rgba(0,0,0,0.05); margin-bottom: 10px; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+    .val-primary { color: #1a73e8; font-size: 16px; font-weight: bold; }
+    .val-success { color: #198754; font-size: 16px; font-weight: bold; }
+    .val-danger { color: #dc3545; font-size: 16px; font-weight: bold; }
+    .student-card { background: white; border-radius: 10px; padding: 12px; margin-bottom: 10px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-left: 4px solid #1a73e8; }
+    .student-name { font-weight: bold; font-size: 15px; color: #333; }
+    .badge-class { font-size: 11px; background: #e9ecef; color: #495057; padding: 4px 8px; border-radius: 20px; }
+    .payment-info { font-size: 11.5px; color: #6c757d; margin-top: 6px; }
+
+    #aiChatLauncher { position: fixed; right: 18px; bottom: 18px; z-index: 2000; width: 58px; height: 58px; border: 0; border-radius: 50%; background: linear-gradient(135deg,#673ab7,#3f51b5); color: #fff; font-size: 27px; box-shadow: 0 5px 18px rgba(0,0,0,.25); }
+    #aiChatPanel { position: fixed; right: 14px; bottom: 88px; z-index: 2001; width: min(390px, calc(100vw - 28px)); height: min(560px, calc(100vh - 120px)); background: #fff; border-radius: 16px; box-shadow: 0 8px 30px rgba(0,0,0,.25); display: none; flex-direction: column; overflow: hidden; border: 1px solid #e5e7eb; }
+    #aiChatPanel.open { display: flex; }
+    .ai-chat-head { background: linear-gradient(135deg,#673ab7,#3f51b5); color: #fff; padding: 12px 14px; display:flex; justify-content:space-between; align-items:center; }
+    .ai-chat-head button { background:transparent; border:0; color:white; font-size:22px; }
+    #aiChatMessages { flex:1; overflow-y:auto; padding:12px; background:#f7f8fc; }
+    .ai-msg { max-width:88%; padding:9px 11px; margin:7px 0; border-radius:12px; white-space:pre-wrap; overflow-wrap:anywhere; font-size:14px; line-height:1.55; }
+    .ai-msg.user { margin-left:auto; background:#e3eaff; color:#172554; }
+    .ai-msg.bot { margin-right:auto; background:#fff; border:1px solid #e5e7eb; color:#222; }
+    .ai-chat-controls { padding:9px; border-top:1px solid #e5e7eb; background:#fff; }
+    .ai-chat-controls textarea { resize:none; min-height:42px; max-height:100px; }
+    .ai-chat-controls .btn { white-space:nowrap; }
+  </style>
+</head>
+<body>
+  <div class="app-header">👨‍🏫 របាយការណ៍ថវិកាផ្ទាល់ខ្លួន</div>
+
+  <div class="container mt-4">
+    <div class="filter-box">
+      <div class="mb-3">
+        <label class="form-label fw-bold text-secondary fs-6" for="monthFilter">📅 ជ្រើសរើសខែ</label>
+        <input type="month" id="monthFilter" class="form-control form-control-lg">
+      </div>
+      <div class="mb-2">
+        <label class="form-label fw-bold text-secondary fs-6" for="teacherSelect">👤 ជ្រើសរើសឈ្មោះរបស់អ្នក</label>
+        <select id="teacherSelect" class="form-select form-select-lg fw-bold text-primary">
+          <option value="">-- សូមជ្រើសរើស --</option>
+        </select>
+      </div>
+    </div>
+
+    <div id="loader" class="text-center d-none my-5">
+      <div class="spinner-border text-primary" role="status" style="width: 3rem; height: 3rem;"></div>
+      <div class="mt-3 text-muted fw-bold" id="loaderText">កំពុងទាញយកទិន្នន័យ...</div>
+    </div>
+
+    <div id="errorBox" class="alert alert-danger d-none" role="alert"></div>
+
+    <div id="dashboardData" class="d-none">
+      <h6 class="fw-bold text-secondary mb-3">📊 សង្ខេបថវិកាខែនេះ</h6>
+      <div class="row g-2">
+        <div class="col-6">
+          <div class="summary-box">
+            <div class="text-muted mb-1" style="font-size: 12px;">សិស្សសរុប</div>
+            <div class="val-primary" id="vStudents" style="font-size: 18px;">0</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="summary-box">
+            <div class="text-muted mb-1" style="font-size: 12px;">ថវិកាសរុប (១០០%)</div>
+            <div class="val-primary" id="vTotal">0 ៛</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="summary-box" style="border: 1px solid #198754; background: #f8fff9;">
+            <div class="text-success mb-1 fw-bold" style="font-size: 12px;">✅ គ្រូ (៨០%)</div>
+            <div class="val-success" id="vTeacher">0 ៛</div>
+          </div>
+        </div>
+        <div class="col-6">
+          <div class="summary-box" style="border: 1px solid #dc3545; background: #fff8f8;">
+            <div class="text-danger mb-1 fw-bold" style="font-size: 12px;">🏫 សាលា (២០%)</div>
+            <div class="val-danger" id="vSchool">0 ៛</div>
+          </div>
+        </div>
+      </div>
+
+      <h6 class="fw-bold mt-4 mb-3 text-secondary">📋 បញ្ជីសិស្សបានបង់ប្រាក់</h6>
+      <div id="studentList"></div>
+    </div>
+  </div>
+
+  <!-- AI Chat Widget -->
+  <button id="aiChatLauncher" type="button" aria-label="បើក Khmer AI Chatbot">🤖</button>
+  <section id="aiChatPanel" aria-label="Khmer AI Chatbot">
+    <div class="ai-chat-head">
+      <div>
+        <div class="fw-bold">🤖 Khmer AI Assistant</div>
+        <small>ជំនួយការឆ្លាតវៃជាភាសាខ្មែរ</small>
+      </div>
+      <button type="button" id="aiChatClose" aria-label="បិទ">×</button>
+    </div>
+    <div id="aiChatMessages">
+      <div class="ai-msg bot">សួស្តី! ខ្ញុំជា Khmer AI Assistant។ តើខ្ញុំអាចជួយអ្វីអ្នកបានខ្លះ?</div>
+    </div>
+    <div class="ai-chat-controls">
+      <div class="d-flex gap-2 mb-2">
+        <select id="aiChatModel" class="form-select form-select-sm">
+          <option value="claude-sonnet-4-6">Claude Sonnet 4.6</option>
+        </select>
+        <button type="button" id="aiChatClear" class="btn btn-outline-secondary btn-sm">សម្អាត</button>
+      </div>
+      <div class="d-flex gap-2 align-items-end">
+        <textarea id="aiChatInput" class="form-control" rows="1" placeholder="សរសេរសំណួររបស់អ្នក..."></textarea>
+        <button type="button" id="aiChatSend" class="btn btn-primary">ផ្ញើ</button>
+      </div>
+      <div id="aiChatStatus" class="small text-muted mt-1"></div>
+    </div>
+  </section>
+
+  <script>
+    // ហៅ Netlify Function ជា API Proxy (មិនហៅ Apps Script ដោយផ្ទាល់ពី Browser)
+    const API_ENDPOINT = '/.netlify/functions/api';
+
+    async function callAppsScript(action, payload = {}) {
+      const response = await fetch(API_ENDPOINT, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, payload })
+      });
+
+      const text = await response.text();
+      let result;
+      try {
+        result = JSON.parse(text);
+      } catch (err) {
+        throw new Error('API បានបញ្ជូនទិន្នន័យមិនត្រឹមត្រូវ (HTTP ' + response.status + ')');
+      }
+
+      if (!response.ok) {
+        throw new Error(result.error || ('HTTP ' + response.status));
+      }
+      if (result && result.success === false && result.error) {
+        throw new Error(result.error);
+      }
+      return result;
+    }
+
+    const money = n => (Number(n) || 0).toLocaleString('en-US') + ' ៛';
+    let allPaymentsData = [];
+    let paymentsLoaded = false;
+    let paymentsLoading = false;
+
+    const escapeHtml = value => String(value == null ? '' : value).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+
+    const translateGender = g => {
+      const str = String(g == null ? '' : g).trim().toLowerCase();
+      if (['female', 'f', 'ស្រី', 'ស្ត្រី', 'ភេទស្រី'].includes(str)) return 'ស្រី';
+      if (['male', 'm', 'ប្រុស', 'បុរស', 'ភេទប្រុស'].includes(str)) return 'ប្រុស';
+      return escapeHtml(g);
+    };
+
+    function showError(message) {
+      const box = document.getElementById('errorBox');
+      box.textContent = message;
+      box.classList.remove('d-none');
+      document.getElementById('loader').classList.add('d-none');
+    }
+
+    function setLoading(show, message) {
+      const loader = document.getElementById('loader');
+      document.getElementById('loaderText').textContent = message || 'កំពុងទាញយកទិន្នន័យ...';
+      loader.classList.toggle('d-none', !show);
+    }
+
+    window.addEventListener('load', () => {
+      const now = new Date();
+      document.getElementById('monthFilter').value =
+        now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
+      loadTeachers();
+      loadPayments();
+    });
+
+    document.getElementById('teacherSelect').addEventListener('change', processData);
+    document.getElementById('monthFilter').addEventListener('change', processData);
+
+    async function loadTeachers() {
+      try {
+        const teachers = await callAppsScript('getTeachersList');
+        const select = document.getElementById('teacherSelect');
+        (Array.isArray(teachers) ? teachers : []).forEach(t => {
+          if (!t || !t.name) return;
+          const opt = document.createElement('option');
+          opt.value = t.name;
+          opt.textContent = t.name;
+          select.appendChild(opt);
+        });
+      } catch (err) {
+        showError('កំហុសទាញយកឈ្មោះគ្រូ៖ ' + (err.message || err));
+      }
+    }
+
+    async function loadPayments() {
+      if (paymentsLoading) return;
+      paymentsLoading = true;
+      setLoading(true, 'កំពុងទាញយកបញ្ជីបង់ប្រាក់...');
+      try {
+        const data = await callAppsScript('getPaymentData');
+        allPaymentsData = Array.isArray(data) ? data : [];
+        paymentsLoaded = true;
+        paymentsLoading = false;
+        setLoading(false);
+        processData();
+      } catch (err) {
+        paymentsLoading = false;
+        showError('កំហុសទាញយកបញ្ជីបង់ប្រាក់៖ ' + (err.message || err));
+      }
+    }
+
+    function processData() {
+      const teacher = document.getElementById('teacherSelect').value;
+      const month = document.getElementById('monthFilter').value;
+      document.getElementById('errorBox').classList.add('d-none');
+
+      if (!teacher) {
+        document.getElementById('dashboardData').classList.add('d-none');
+        return;
+      }
+
+      if (!paymentsLoaded) {
+        setLoading(true, 'កំពុងរៀបចំទិន្នន័យ សូមរង់ចាំបន្តិច...');
+        return;
+      }
+
+      setLoading(false);
+
+      const filtered = allPaymentsData.filter(r => {
+        if (!r || !r.paid_date) return false;
+        const paidDate = String(r.paid_date).slice(0, 10);
+        return String(r.teacher_name || '').trim() === teacher && paidDate.startsWith(month);
+      });
+
+      let totalAmount = 0, totalT80 = 0, totalS20 = 0;
+      const studentMap = {};
+
+      filtered.forEach(r => {
+        const amt = Number(r.amount) || 0;
+        totalAmount += amt;
+        totalT80 += Number(r.teacher80) || 0;
+        totalS20 += Number(r.school20) || 0;
+
+        const sKey = String(r.student_id || '') + '_' + String(r.student_name || '');
+        if (!studentMap[sKey]) {
+          studentMap[sKey] = {
+            student_name: r.student_name || '',
+            class: r.class || '',
+            gender: r.gender || '',
+            paid_dates: [],
+            payment_methods: [],
+            total_paid: 0
+          };
+        }
+        studentMap[sKey].total_paid += amt;
+
+        const paidDate = String(r.paid_date || '').slice(0, 10);
+        if (paidDate && !studentMap[sKey].paid_dates.includes(paidDate)) {
+          studentMap[sKey].paid_dates.push(paidDate);
+        }
+        const method = String(r.payment_method || r['Payment Method'] || 'Cash');
+        if (!studentMap[sKey].payment_methods.includes(method)) {
+          studentMap[sKey].payment_methods.push(method);
+        }
+      });
+
+      const students = Object.values(studentMap);
+      document.getElementById('vStudents').textContent = students.length + ' នាក់';
+      document.getElementById('vTotal').textContent = money(totalAmount);
+      document.getElementById('vTeacher').textContent = money(totalT80);
+      document.getElementById('vSchool').textContent = money(totalS20);
+
+      const list = document.getElementById('studentList');
+      list.innerHTML = '';
+
+      if (students.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'text-center text-danger p-3 fw-bold bg-white rounded shadow-sm';
+        empty.textContent = 'មិនមានទិន្នន័យបង់ប្រាក់ក្នុងខែនេះទេ ❌';
+        list.appendChild(empty);
+      } else {
+        students.forEach((s, i) => {
+          const methods = s.payment_methods.map(method => {
+            const isQR = String(method).toUpperCase() === 'QR';
+            return '<span class="badge ' + (isQR ? 'bg-info text-dark' : 'bg-secondary') + '">' +
+              escapeHtml(method) + '</span>';
+          }).join(' ');
+
+          const card = document.createElement('div');
+          card.className = 'student-card d-flex justify-content-between align-items-center gap-2';
+          card.innerHTML = `
+            <div class="min-w-0">
+              <div class="student-name">${i + 1}. ${escapeHtml(s.student_name)}</div>
+              <span class="badge-class mt-1 d-inline-block">${escapeHtml(s.class || 'គ្មានថ្នាក់')} - ${translateGender(s.gender)}</span>
+              <div class="payment-info">
+                📅 ថ្ងៃបង់៖ <span class="text-dark fw-bold">${escapeHtml(s.paid_dates.join(', '))}</span><br>
+                💳 តាមរយៈ៖ ${methods}
+              </div>
+            </div>
+            <div class="fw-bold text-success text-nowrap" style="font-size: 15px;">
+              + ${money(s.total_paid)}
+            </div>`;
+          list.appendChild(card);
+        });
+      }
+
+      document.getElementById('dashboardData').classList.remove('d-none');
+    }
+
+    // AI Chat Setup
+    (function initKhmerAIChat() {
+      const launcher = document.getElementById('aiChatLauncher');
+      const panel = document.getElementById('aiChatPanel');
+      const closeBtn = document.getElementById('aiChatClose');
+      const messagesEl = document.getElementById('aiChatMessages');
+      const input = document.getElementById('aiChatInput');
+      const sendBtn = document.getElementById('aiChatSend');
+      const clearBtn = document.getElementById('aiChatClear');
+      const modelEl = document.getElementById('aiChatModel');
+      const statusEl = document.getElementById('aiChatStatus');
+      let history = [];
+      let busy = false;
+
+      function addMessage(role, content) {
+        const div = document.createElement('div');
+        div.className = 'ai-msg ' + (role === 'user' ? 'user' : 'bot');
+        div.textContent = content;
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function setBusy(value, message) {
+        busy = value;
+        sendBtn.disabled = value;
+        input.disabled = value;
+        statusEl.textContent = message || '';
+      }
+
+      launcher.addEventListener('click', () => panel.classList.toggle('open'));
+      closeBtn.addEventListener('click', () => panel.classList.remove('open'));
+
+      clearBtn.addEventListener('click', () => {
+        if (busy) return;
+        history = [];
+        messagesEl.innerHTML = '';
+        addMessage('assistant', 'បានសម្អាតប្រវត្តិសន្ទនា។ តើមានអ្វីឱ្យខ្ញុំជួយ?');
+        statusEl.textContent = '';
+      });
+
+      async function sendMessage() {
+        const text = input.value.trim();
+        if (!text || busy) return;
+        history.push({ role: 'user', content: text });
+        addMessage('user', text);
+        input.value = '';
+        setBusy(true, 'កំពុងគិត...');
+
+        try {
+          const result = await callAppsScript('chatWithAI', {
+            messages: history.slice(-20),
+            selectedModel: modelEl.value
+          });
+          setBusy(false, '');
+          if (result && result.success && result.answer) {
+            history.push({ role: 'assistant', content: result.answer });
+            history = history.slice(-20);
+            addMessage('assistant', result.answer);
+          } else {
+            const error = result && result.error ? result.error : 'AI មិនអាចឆ្លើយតបបានទេ។';
+            addMessage('assistant', 'សូមអភ័យទោស៖ ' + error);
+          }
+        } catch (err) {
+          setBusy(false, '');
+          addMessage('assistant', 'មានបញ្ហាក្នុងការភ្ជាប់៖ ' + (err.message || err));
+        }
+      }
+
+      sendBtn.addEventListener('click', sendMessage);
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          sendMessage();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>

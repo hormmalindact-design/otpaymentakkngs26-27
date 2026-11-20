@@ -1,0 +1,6 @@
+{
+  "name": "school-payment-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Mobile teacher payment report hosted on Netlify with Google Apps Script and Sheets backend"
+}
